@@ -17,26 +17,31 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "amd64"  ;; \
   "linux/arm64")   echo "aarch64" ;; \
+  "linux/armhf")   echo "armhf" ;; \
   *)               echo ""        ;; esac) && \
   export S6_ARCH_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "6019b6b06cfdbb1d1cd572d46b9b158a4904fd19ca59d374de4ddaaa6a3727d5" ;; \
   "linux/arm64")   echo "e73f9a021b64f88278830742149c14ef8a52331102881ba025bf32a66a0e7c78" ;; \
+  "linux/armhf")   echo "543fcd54eae55d393ac799443f89752436797b5a547871831aafda00913fc88f" ;; \
   *)               echo ""        ;; esac) && \
   export S6_DOWNLOAD_ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-x86_64.tar.xz"   ;; \
   "linux/arm64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.xz" ;; \
+  "linux/armhf")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-armhf.tar.xz" ;; \
   *)               echo ""        ;; esac) && \
   export FFMPEG_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "d92b8ecf6ab3d702a349ebcded03c66349eded1c7bdda2bc103fda2b62b8cbde" ;; \
   "linux/arm64")   echo "e6eccb2494a5fa0cfe04869bff074739d6d615896a6592e17d88c219298e52c1" ;; \
+  "linux/armhf")   echo "c1e80da5a3cca331f8d1ce665a3970aa2e29e6164b1f1421237beba155a0dcce" ;; \
   *)               echo ""        ;; esac) && \
   export FFMPEG_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linux64-gpl.tar.xz"   ;; \
   "linux/arm64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linuxarm64-gpl.tar.xz" ;; \
+  "linux/armhf")   echo "https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-armhf-static.tar.xz" ;; \
   *)               echo ""        ;; esac) && \
   export S6_NOARCH_EXPECTED_SHA256="cee89d3eeabdfe15239b2c5c3581d9352d2197d4fd23bba3f1e64bf916ccf496" && \
   export S6_DOWNLOAD_NOARCH="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-noarch.tar.xz" && \
-  echo "Building for arch: ${ARCH}|${ARCH44}, downloading S6 from: ${S6_DOWNLOAD}}, expecting S6 SHA256: ${S6_EXPECTED_SHA256}" && \
+  echo "Building for arch: ${ARCH}|${ARCH44}, downloading S6 from: ${S6_DOWNLOAD}, expecting S6 SHA256: ${S6_EXPECTED_SHA256}" && \
   set -x && \
   apt-get update && \
   apt-get -y --no-install-recommends install locales && \
@@ -56,8 +61,12 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   curl -L ${FFMPEG_DOWNLOAD} --output /tmp/ffmpeg-${ARCH}.tar.xz && \
   sha256sum /tmp/ffmpeg-${ARCH}.tar.xz && \
   echo "${FFMPEG_EXPECTED_SHA256}  /tmp/ffmpeg-${ARCH}.tar.xz" | sha256sum -c - && \
-  tar -xf /tmp/ffmpeg-${ARCH}.tar.xz --strip-components=2 --no-anchored -C /usr/local/bin/ "ffmpeg" && \
-  tar -xf /tmp/ffmpeg-${ARCH}.tar.xz --strip-components=2 --no-anchored -C /usr/local/bin/ "ffprobe" && \
+  tar -xf /tmp/ffmpeg-${ARCH}.tar.xz --strip-components=$(case ${TARGETPLATFORM:-linux/amd64} in \
+  "linux/armhf")   echo "1" ;; \
+  *)               echo "2"        ;; esac) --no-anchored -C /usr/local/bin/ "ffmpeg" && \
+  tar -xf /tmp/ffmpeg-${ARCH}.tar.xz --strip-components=$(case ${TARGETPLATFORM:-linux/amd64} in \
+  "linux/armhf")   echo "1" ;; \
+  *)               echo "2"        ;; esac) --no-anchored -C /usr/local/bin/ "ffprobe" && \
   # Clean up
   rm -rf /tmp/s6-overlay-${ARCH}.tar.gz && \
   rm -rf /tmp/ffmpeg-${ARCH}.tar.xz && \
@@ -95,10 +104,12 @@ RUN set -x && \
   libpq-dev \
   libpq5 \
   libjpeg62-turbo \
-  libwebp6 \
   libjpeg-dev \
   zlib1g-dev \
   libwebp-dev \
+  libopenjp2-7 \
+  libtiff5 \
+  libxcb1 \
   redis-server && \
   # Install pipenv
   pip3 --disable-pip-version-check install wheel pipenv && \
@@ -131,8 +142,7 @@ RUN set -x && \
   postgresql-common \
   libpq-dev \
   libjpeg-dev \
-  zlib1g-dev \
-  libwebp-dev && \
+  zlib1g-dev && \
   apt-get -y autoremove && \
   apt-get -y autoclean && \
   rm -rf /var/lib/apt/lists/* && \
